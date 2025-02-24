@@ -8,7 +8,19 @@ const API_PATH = import.meta.env.VITE_API_PATH;
 function App() {
   const [products, setProducts] = useState([]);
   const [tempProduct, setTempProduct] = useState([]);
-  // const [addCart, setAddCart] = useState([]);
+
+  const[carts, setCarts] = useState([]);
+
+  //取得cart
+  const getCarts = async()=>{
+    try {
+      const res = await axios.get(`${BASE_URL}/v2/api/${API_PATH}/cart`);
+      setCarts(res.data.data.carts);
+    } catch (error) {
+      console.error(error);
+      alert("取得購物車失敗");
+    }
+  }
 
   useEffect(() => {
     const getProducts = async () => {
@@ -20,7 +32,9 @@ function App() {
         alert("取得產品失敗");
       }
     };
+    
     getProducts();
+    getCarts();
   }, []);
 
   const productModalRef = useRef(null);
@@ -44,6 +58,73 @@ function App() {
   };
 
   const [qtySelect, setQtySelect] = useState(1);
+
+  //加入購物車
+  const addCartItem = async (product_id, qty = 1) => {
+    try {
+      await axios.post(`${BASE_URL}/v2/api/${API_PATH}/cart`, {
+        data:{
+          product_id,
+          qty: Number(qty)
+        }
+      });
+      //成功後刷新購物車
+      getCarts();
+    } catch (error) {
+      console.error(error);
+      alert("加入購物車失敗");
+    }
+  }
+  //調整購物車品項
+  const editCartItem = async (cart_id, product_id, qty = 1) => {
+    // 如果 qty 小於 1，直接返回不做任何處理 作法A
+    if (qty < 1) {
+      console.warn("qty 不能小於 1");
+      return;
+    }
+    // 當 qty 小於 1 時，自動刪除該項目 作法B
+    // if (qty < 1) {
+    //   return deleCartItem(cart_id);
+    // }
+    try {
+      await axios.put(`${BASE_URL}/v2/api/${API_PATH}/cart/${cart_id}`, {
+        data:{
+          product_id,
+          qty: Number(qty)
+        }
+      });
+      //成功後刷新購物車
+      getCarts();
+    } catch (error) {
+      console.error(error);
+      alert("調整購物車數量失敗");
+    }
+  }
+  //刪除購物車品項
+  const deleCartItem = async (cart_id) => {
+    try {
+      await axios.delete(`${BASE_URL}/v2/api/${API_PATH}/cart/${cart_id}`);
+      alert("刪除購物車品項成功");
+      //成功後刷新購物車
+      getCarts();
+    } catch (error) {
+      console.error(error);
+      alert("刪除購物車品項失敗");
+    }
+  }
+  //刪除購物車品項
+  const deleAllCartItem = async () => {
+    try {
+      await axios.delete(`${BASE_URL}/v2/api/${API_PATH}/carts`);
+      alert("刪除全部購物車成功");
+      //成功後刷新購物車
+      getCarts();
+    } catch (error) {
+      console.error(error);
+      alert("刪除全部購物車失敗");
+    }
+  }
+
 
   return (
     <div className="container">
@@ -81,7 +162,7 @@ function App() {
                     >
                       查看更多
                     </button>
-                    <button type="button" className="btn btn-outline-danger">
+                    <button onClick={() => addCartItem(product.id, 1)} type="button" className="btn btn-outline-danger">
                       加到購物車
                     </button>
                   </div>
@@ -141,7 +222,7 @@ function App() {
                 </div>
               </div>
               <div className="modal-footer">
-                <button type="button" className="btn btn-primary">
+                <button onClick={ () =>addCartItem(tempProduct.id, qtySelect)} type="button" className="btn btn-primary">
                   加入購物車
                 </button>
               </div>
@@ -150,11 +231,12 @@ function App() {
         </div>
 
         <div className="text-end py-3">
-          <button className="btn btn-outline-danger" type="button">
+          <button onClick={ () => deleAllCartItem() } className="btn btn-outline-danger" type="button">
             清空購物車
           </button>
         </div>
 
+        {/* cartTable */}
         <table className="table align-middle">
           <thead>
             <tr>
@@ -166,27 +248,35 @@ function App() {
           </thead>
 
           <tbody>
-            <tr>
+            {carts.map((cart) =>(
+            <tr key={cart.id}>
               <td>
-                <button type="button" className="btn btn-outline-danger btn-sm">
+                <button onClick={() => deleCartItem(cart.id)} type="button" className="btn btn-outline-danger btn-sm">
                   x
                 </button>
               </td>
-              <td></td>
+              <td>{cart.product.title}</td>
               <td style={{ width: "150px" }}>
                 <div className="d-flex align-items-center">
                   <div className="btn-group me-2" role="group">
                     <button
+                      onClick={() => editCartItem(cart.id, cart.product.id, cart.qty - 1)}
                       type="button"
-                      className="btn btn-outline-dark btn-sm"
+                      className={`btn btn-sm ${cart.qty === 1 ? "btn-outline-danger" : "btn-outline-dark"}`}
+                      disabled={cart.qty === 1} // 避免 qty 變成 0
                     >
                       -
                     </button>
+
                     <span
                       className="btn border border-dark"
                       style={{ width: "50px", cursor: "auto" }}
-                    ></span>
+                    >
+                      {cart.qty}
+                    </span>
+
                     <button
+                      onClick={() => editCartItem(cart.id, cart.product.id, cart.qty+1)}
                       type="button"
                       className="btn btn-outline-dark btn-sm"
                     >
@@ -194,24 +284,25 @@ function App() {
                     </button>
                   </div>
                   <span className="input-group-text bg-transparent border-0">
-                    unit
+                    {cart.product.unit}
                   </span>
                 </div>
               </td>
-              <td className="text-end">單項總價</td>
+              <td className="text-end"> {cart.total}</td>
             </tr>
+            ))}
           </tbody>
           <tfoot>
             <tr>
               <td colSpan="3" className="text-end">
-                總計：
+                總計：{carts.map((cart)=>cart.total).reduce((a,b)=>a+b,0)}
               </td>
               <td className="text-end" style={{ width: "130px" }}></td>
             </tr>
           </tfoot>
         </table>
       </div>
-
+      {/* orderTable */}
       <div className="my-5 row justify-content-center">
         <form className="col-md-6">
           <div className="mb-3">
