@@ -68,8 +68,9 @@ function App() {
           qty: Number(qty)
         }
       });
-      //成功後刷新購物車
+      //成功後刷新購物車，並關閉modal
       getCarts();
+      closeModal();
     } catch (error) {
       console.error(error);
       alert("加入購物車失敗");
@@ -104,7 +105,6 @@ function App() {
   const deleCartItem = async (cart_id) => {
     try {
       await axios.delete(`${BASE_URL}/v2/api/${API_PATH}/cart/${cart_id}`);
-      alert("刪除購物車品項成功");
       //成功後刷新購物車
       getCarts();
     } catch (error) {
@@ -112,8 +112,8 @@ function App() {
       alert("刪除購物車品項失敗");
     }
   }
-  //刪除購物車品項
-  const deleAllCartItem = async () => {
+  //移除全部購物車品項
+  const deleAllCart = async () => {
     try {
       await axios.delete(`${BASE_URL}/v2/api/${API_PATH}/carts`);
       alert("刪除全部購物車成功");
@@ -151,7 +151,7 @@ function App() {
                 <td>{product.title}</td>
                 <td>
                   <del className="h6">原價 {product.origin_price} 元</del>
-                  <div className="h5">特價 {product.origin_price}元</div>
+                  <div className="h5">特價 {product.price}元</div>
                 </td>
                 <td>
                   <div className="btn-group btn-group-sm">
@@ -171,7 +171,8 @@ function App() {
             ))}
           </tbody>
         </table>
-
+        
+        {/* productModalRef */}
         <div
           ref={productModalRef}
           style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
@@ -222,85 +223,102 @@ function App() {
                 </div>
               </div>
               <div className="modal-footer">
-                <button onClick={ () =>addCartItem(tempProduct.id, qtySelect)} type="button" className="btn btn-primary">
+                <button onClick={ () => addCartItem(tempProduct.id, qtySelect)} type="button" className="btn btn-primary">
                   加入購物車
+                </button>
+                <button type="button" onClick={closeModal} className="btn btn-secondary">
+                  取消
                 </button>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="text-end py-3">
-          <button onClick={ () => deleAllCartItem() } className="btn btn-outline-danger" type="button">
-            清空購物車
-          </button>
-        </div>
+        {
+          carts.length > 0 ? 
+          <>
+            <div className="text-end py-3">
+              <button onClick={ () => deleAllCart() } className="btn btn-outline-danger" type="button">
+                清空購物車
+              </button>
+            </div>
+            <table className="table align-middle">
+              <thead>
+                <tr>
+                  <th></th>
+                  <th>品名</th>
+                  <th style={{ width: "150px" }}>數量/單位</th>
+                  <th className="text-end">單價</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {carts.map((cart) =>(
+                <tr key={cart.id}>
+                  <td>
+                    <button onClick={() => deleCartItem(cart.id)} type="button" className="btn btn-outline-danger btn-sm">
+                      x
+                    </button>
+                  </td>
+                  <td>{cart.product.title}</td>
+                  <td style={{ width: "150px" }}>
+                    <div className="d-flex align-items-center">
+                      <div className="btn-group me-2" role="group">
+                        <button
+                          onClick={() => editCartItem(cart.id, cart.product.id, cart.qty - 1)}
+                          type="button"
+                          className={`btn btn-sm ${cart.qty === 1 ? "btn-outline-secondary" : "btn-outline-dark"}`}
+                          // className="btn btn-sm btn-outline-dark"
+                          disabled={cart.qty === 1} // 避免 qty 變成 0
+                        >
+                          -
+                        </button>
+
+                        <span
+                          className="btn border border-dark"
+                          style={{ width: "50px", cursor: "auto" }}
+                        >
+                          {cart.qty}
+                        </span>
+
+                        <button
+                          onClick={() => editCartItem(cart.id, cart.product.id, cart.qty+1)}
+                          type="button"
+                          className="btn btn-outline-dark btn-sm"
+                        >
+                          +
+                        </button>
+                      </div>
+                      <span className="input-group-text bg-transparent border-0">
+                        {cart.product.unit}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="text-end"> {cart.total}</td>
+                </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colSpan="3" className="text-end">
+                    總計：
+                  </td>
+                  <td className="text-end" style={{ width: "130px" }}>
+                    { carts.reduce((total, cart) => total + cart.total, 0) }
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </>
+          : (
+          <div className="text-center text-muted">
+            <p>🛒 購物車是空的</p>
+          </div>)
+        }
 
         {/* cartTable */}
-        <table className="table align-middle">
-          <thead>
-            <tr>
-              <th></th>
-              <th>品名</th>
-              <th style={{ width: "150px" }}>數量/單位</th>
-              <th className="text-end">單價</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {carts.map((cart) =>(
-            <tr key={cart.id}>
-              <td>
-                <button onClick={() => deleCartItem(cart.id)} type="button" className="btn btn-outline-danger btn-sm">
-                  x
-                </button>
-              </td>
-              <td>{cart.product.title}</td>
-              <td style={{ width: "150px" }}>
-                <div className="d-flex align-items-center">
-                  <div className="btn-group me-2" role="group">
-                    <button
-                      onClick={() => editCartItem(cart.id, cart.product.id, cart.qty - 1)}
-                      type="button"
-                      className={`btn btn-sm ${cart.qty === 1 ? "btn-outline-danger" : "btn-outline-dark"}`}
-                      disabled={cart.qty === 1} // 避免 qty 變成 0
-                    >
-                      -
-                    </button>
-
-                    <span
-                      className="btn border border-dark"
-                      style={{ width: "50px", cursor: "auto" }}
-                    >
-                      {cart.qty}
-                    </span>
-
-                    <button
-                      onClick={() => editCartItem(cart.id, cart.product.id, cart.qty+1)}
-                      type="button"
-                      className="btn btn-outline-dark btn-sm"
-                    >
-                      +
-                    </button>
-                  </div>
-                  <span className="input-group-text bg-transparent border-0">
-                    {cart.product.unit}
-                  </span>
-                </div>
-              </td>
-              <td className="text-end"> {cart.total}</td>
-            </tr>
-            ))}
-          </tbody>
-          <tfoot>
-            <tr>
-              <td colSpan="3" className="text-end">
-                總計：{carts.map((cart)=>cart.total).reduce((a,b)=>a+b,0)}
-              </td>
-              <td className="text-end" style={{ width: "130px" }}></td>
-            </tr>
-          </tfoot>
-        </table>
+        
+        
       </div>
       {/* orderTable */}
       <div className="my-5 row justify-content-center">
