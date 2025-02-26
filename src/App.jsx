@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useForm } from "react-hook-form";
 import axios from "axios";
 import { Modal } from "bootstrap";
 
@@ -122,6 +123,47 @@ function App() {
     } catch (error) {
       console.error(error);
       alert("刪除全部購物車失敗");
+    }
+  }
+
+
+  const { register, handleSubmit, formState:{ errors }, reset } = useForm();
+
+  //送出Submit事件驅動
+  const onSubmit =  handleSubmit((data) => {
+    //console.log("送出訂單，data", data);
+    const { message, ...user } = data; //data資料"解構"成message，剩下的打包一起變成user
+
+    const userinfo = {
+      data:{
+        user,
+        message
+      }
+    }
+    checkOut(userinfo);
+    // 提交成功後重設表單
+    reset();
+  });
+
+  const checkOut = async (data) => {
+    try {
+      await axios.post(`${BASE_URL}/v2/api/${API_PATH}/order`, {
+        data: {
+          "user": {
+            "name": data.name,
+            "email": data.email,
+            "tel": data.tel,
+            "address": data.address
+          },
+          "message": data.message
+        }
+      })
+      //成功後刷新購物車，等待下一位客人
+      getCarts();
+      alert("已送出訂單");
+    } catch (error) {
+      console.error(error);
+      alert("結帳失敗");
     }
   }
 
@@ -322,19 +364,26 @@ function App() {
       </div>
       {/* orderTable */}
       <div className="my-5 row justify-content-center">
-        <form className="col-md-6">
+        <form onSubmit={onSubmit} className="col-md-6">
           <div className="mb-3">
             <label htmlFor="email" className="form-label">
               Email
             </label>
             <input
+              {
+                ...register('email', {
+                required: "Email 欄位必填",
+                pattern: {
+                  value: /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
+                  message: "Email 格式錯誤"
+                }})
+              }
               id="email"
               type="email"
-              className="form-control"
+              className={`form-control ${errors.email ? "is-invalid" : ""}`}
               placeholder="請輸入 Email"
             />
-
-            <p className="text-danger my-2"></p>
+            { errors.email && <p className="text-danger my-2">{errors.email.message}</p> }
           </div>
 
           <div className="mb-3">
@@ -342,12 +391,12 @@ function App() {
               收件人姓名
             </label>
             <input
+            { ...register('name', { required: "姓名 欄位必填" }) }
               id="name"
-              className="form-control"
+              className={`form-control ${errors.name ? "is-invalid" : ""}`}
               placeholder="請輸入姓名"
             />
-
-            <p className="text-danger my-2"></p>
+            { errors.name && <p className="text-danger my-2">{errors.name.message}</p> }
           </div>
 
           <div className="mb-3">
@@ -355,13 +404,22 @@ function App() {
               收件人電話
             </label>
             <input
+              {
+                ...register('tel', {
+                required: "電話 欄位必填",
+                pattern: {
+                  value: /^(0[2-8]\d{7}|09\d{8})$/,
+                  message: "電話 格式錯誤"
+                }})
+              }
               id="tel"
               type="text"
-              className="form-control"
+              className={`form-control ${errors.tel ? "is-invalid" : ""}`}
               placeholder="請輸入電話"
             />
-
-            <p className="text-danger my-2"></p>
+            { 
+              errors.tel && <p className="text-danger my-2">{errors.tel.message}</p> 
+            }
           </div>
 
           <div className="mb-3">
@@ -369,13 +427,16 @@ function App() {
               收件人地址
             </label>
             <input
+              {
+                ...register('address', { required: "地址 欄位必填"})
+              }
               id="address"
               type="text"
-              className="form-control"
+              className={`form-control ${errors.address ? "is-invalid" : ""}`}
               placeholder="請輸入地址"
             />
 
-            <p className="text-danger my-2"></p>
+            { errors.address && <p className="text-danger my-2">{errors.address.message}</p> }
           </div>
 
           <div className="mb-3">
@@ -383,6 +444,7 @@ function App() {
               留言
             </label>
             <textarea
+              { ...register('message') }
               id="message"
               className="form-control"
               cols="30"
