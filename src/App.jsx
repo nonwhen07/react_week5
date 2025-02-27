@@ -3,6 +3,8 @@ import { useForm } from "react-hook-form";
 import axios from "axios";
 import { Modal } from "bootstrap";
 
+import ReactLoading from 'react-loading';
+
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 const API_PATH = import.meta.env.VITE_API_PATH;
 
@@ -10,20 +12,26 @@ function App() {
   const [products, setProducts] = useState([]);
   const [tempProduct, setTempProduct] = useState([]);
 
-  const[carts, setCarts] = useState([]);
+  const [carts, setCarts] = useState([]);
+
+  const [isScreenLoading, setIsScreenLoading] = useState(false);
 
   //取得cart
   const getCarts = async()=>{
+    setIsScreenLoading(true);
     try {
       const res = await axios.get(`${BASE_URL}/v2/api/${API_PATH}/cart`);
       setCarts(res.data.data.carts);
     } catch (error) {
       console.error(error);
       alert("取得購物車失敗");
+    }finally{
+      setIsScreenLoading(false);
     }
   }
 
   useEffect(() => {
+    setIsScreenLoading(true);
     const getProducts = async () => {
       try {
         const res = await axios.get(`${BASE_URL}/v2/api/${API_PATH}/products`);
@@ -31,9 +39,11 @@ function App() {
       } catch (error) {
         console.error(error);
         alert("取得產品失敗");
+      }finally{
+        setIsScreenLoading(false);
       }
     };
-    
+    //畫面渲染後初步載入產品列表+購物車
     getProducts();
     getCarts();
   }, []);
@@ -62,6 +72,7 @@ function App() {
 
   //加入購物車
   const addCartItem = async (product_id, qty = 1) => {
+    setIsScreenLoading(true);
     try {
       await axios.post(`${BASE_URL}/v2/api/${API_PATH}/cart`, {
         data:{
@@ -75,10 +86,13 @@ function App() {
     } catch (error) {
       console.error(error);
       alert("加入購物車失敗");
+    }finally{
+      setIsScreenLoading(false);
     }
   }
   //調整購物車品項
   const editCartItem = async (cart_id, product_id, qty = 1) => {
+    setIsScreenLoading(true);
     // 如果 qty 小於 1，直接返回不做任何處理 作法A
     if (qty < 1) {
       console.warn("qty 不能小於 1");
@@ -100,10 +114,13 @@ function App() {
     } catch (error) {
       console.error(error);
       alert("調整購物車數量失敗");
+    }finally{
+      setIsScreenLoading(false);
     }
   }
   //刪除購物車品項
   const deleCartItem = async (cart_id) => {
+    setIsScreenLoading(true);
     try {
       await axios.delete(`${BASE_URL}/v2/api/${API_PATH}/cart/${cart_id}`);
       //成功後刷新購物車
@@ -111,10 +128,13 @@ function App() {
     } catch (error) {
       console.error(error);
       alert("刪除購物車品項失敗");
+    }finally{
+      setIsScreenLoading(false);
     }
   }
   //移除全部購物車品項
   const deleAllCart = async () => {
+    setIsScreenLoading(true);
     try {
       await axios.delete(`${BASE_URL}/v2/api/${API_PATH}/carts`);
       alert("刪除全部購物車成功");
@@ -123,6 +143,8 @@ function App() {
     } catch (error) {
       console.error(error);
       alert("刪除全部購物車失敗");
+    }finally{
+      setIsScreenLoading(false);
     }
   }
 
@@ -131,44 +153,35 @@ function App() {
 
   //送出Submit事件驅動
   const onSubmit =  handleSubmit((data) => {
-    //console.log("送出訂單，data", data);
     const { message, ...user } = data; //data資料"解構"成message，剩下的打包一起變成user
-
     const userinfo = {
-      data:{
-        user,
-        message
+      data: {
+        user: user,
+        message: message
       }
     }
-    checkOut(userinfo);
-    // 提交成功後重設表單
-    reset();
+    checkOut(userinfo);  
   });
 
-  const checkOut = async (data) => {
+  const checkOut = async (orderData) => {
+    setIsScreenLoading(true);
     try {
-      await axios.post(`${BASE_URL}/v2/api/${API_PATH}/order`, {
-        data: {
-          "user": {
-            "name": data.name,
-            "email": data.email,
-            "tel": data.tel,
-            "address": data.address
-          },
-          "message": data.message
-        }
-      })
+      await axios.post(`${BASE_URL}/v2/api/${API_PATH}/order`, orderData);
       //成功後刷新購物車，等待下一位客人
       getCarts();
+      reset(); // 提交成功後重設表單
       alert("已送出訂單");
     } catch (error) {
       console.error(error);
       alert("結帳失敗");
+    }finally{
+      setIsScreenLoading(false);
     }
   }
 
 
   return (
+    <>
     <div className="container">
       <div className="mt-4">
         <table className="table align-middle">
@@ -459,6 +472,26 @@ function App() {
         </form>
       </div>
     </div>
+
+
+    {
+      isScreenLoading && (
+      <div className="d-flex justify-content-center align-items-center"
+        style={{
+          position: "fixed",
+          inset: 0,
+          backgroundColor: "rgba(255,255,255,0.3)",
+          zIndex: 999,
+        }}
+      >
+        <ReactLoading type="spin" color="black" width="4rem" height="4rem" />
+      </div>
+      )
+    }
+    
+    
+
+    </>
   );
 }
 
