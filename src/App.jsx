@@ -11,10 +11,10 @@ const API_PATH = import.meta.env.VITE_API_PATH;
 function App() {
   const [products, setProducts] = useState([]);
   const [tempProduct, setTempProduct] = useState([]);
-
   const [carts, setCarts] = useState([]);
-
   const [isScreenLoading, setIsScreenLoading] = useState(false);
+  // const [isLoading, setIsLoading] = useState(false); //改用下面的loadingItems，先儲存商品ID來標定loading位置
+  const [loadingItems, setLoadingItems] = useState({}); // 用物件儲存各商品的 Loading 狀態
 
   //取得cart
   const getCarts = async()=>{
@@ -71,25 +71,39 @@ function App() {
   const [qtySelect, setQtySelect] = useState(1);
 
   //加入購物車
-  const addCartItem = async (product_id, qty = 1) => {
-    setIsScreenLoading(true);
+  const addCartItem = async (product_id, qty = 1, source = "table") => {
+    // 如果 qty 小於 1，直接返回不做任何處理
+    if (qty < 1) {
+      console.warn("qty 不能小於 1");
+      return;
+    }
+
+    setLoadingItems((prev) => ({
+      ...prev,
+      [product_id]: { ...prev[product_id], [source]: true }, // 只改變對應的 source
+    }));
+
     try {
       await axios.post(`${BASE_URL}/v2/api/${API_PATH}/cart`, {
-        data:{
+        data: {
           product_id,
-          qty: Number(qty)
-        }
+          qty: Number(qty),
+        },
       });
-      //成功後刷新購物車，並關閉modal
+      // 成功後刷新購物車
       getCarts();
       closeModal();
     } catch (error) {
       console.error(error);
       alert("加入購物車失敗");
-    }finally{
-      setIsScreenLoading(false);
+    } finally {
+      setLoadingItems((prev) => ({
+        ...prev,
+        [product_id]: { ...prev[product_id], [source]: false }, // 結束 Loading
+      }));
     }
-  }
+  };
+
   //調整購物車品項
   const editCartItem = async (cart_id, product_id, qty = 1) => {
     setIsScreenLoading(true);
@@ -98,7 +112,7 @@ function App() {
       console.warn("qty 不能小於 1");
       return;
     }
-    // 當 qty 小於 1 時，自動刪除該項目 作法B
+    // 當 qty 小於 1 時，自動刪除該項目，但是可能造成使用者不理解品像突然消失，故不適用 作法B
     // if (qty < 1) {
     //   return deleCartItem(cart_id);
     // }
@@ -190,7 +204,7 @@ function App() {
               <th>圖片</th>
               <th>商品名稱</th>
               <th>價格</th>
-              <th></th>
+              <th style={{ minWidth: "200px", width: "auto", maxWidth: "280px" }}></th>
             </tr>
           </thead>
           <tbody>
@@ -217,9 +231,19 @@ function App() {
                     >
                       查看更多
                     </button>
-                    <button onClick={() => addCartItem(product.id, 1)} type="button" className="btn btn-outline-danger">
+                    <button disabled={loadingItems[product.id]?.table} onClick={() => addCartItem(product.id, 1, "table")} type="button" 
+                      className="btn btn-outline-danger d-flex align-items-center">
                       加到購物車
+                      {
+                        loadingItems[product.id]?.table && (
+                          // <ReactLoading className="d-flex align-items-center" type="spin" color="#000" height="1.25rem" width="1.25rem" />
+                          <div className="d-flex align-items-center" style={{ width: "20px", height: "20px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            <ReactLoading type="spin" color="#000" height="1.25rem" width="1.25rem" />
+                          </div>
+                        )
+                      }
                     </button>
+                    
                   </div>
                 </td>
               </tr>
@@ -228,8 +252,7 @@ function App() {
         </table>
         
         {/* productModalRef */}
-        <div
-          ref={productModalRef}
+        <div ref={productModalRef}
           style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
           className="modal fade"
           id="productModal"
@@ -278,8 +301,12 @@ function App() {
                 </div>
               </div>
               <div className="modal-footer">
-                <button onClick={ () => addCartItem(tempProduct.id, qtySelect)} type="button" className="btn btn-primary">
+                <button disabled={loadingItems[tempProduct.id]?.modal} onClick={() => addCartItem(tempProduct.id, qtySelect, "modal")} type="button" 
+                  className="btn btn-primary d-flex align-items-center gap-2">
                   加入購物車
+                  {
+                    loadingItems[tempProduct.id]?.modal && (<ReactLoading type={"spin"} color={"#000"} height={"1.5rem"} width={"1.5rem"} />)
+                  }
                 </button>
                 <button type="button" onClick={closeModal} className="btn btn-secondary">
                   取消
